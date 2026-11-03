@@ -2,18 +2,6 @@ import SwiftUI
 import SwiftData
 import Charts
 
-/// Resumen de un día: cuántas rutinas tocaban y cuántas cumpliste.
-struct DayStat: Identifiable {
-    let date: Date
-    let scheduled: Int
-    let completed: Int
-
-    var id: Date { date }
-    var percentage: Double {
-        scheduled == 0 ? 0 : Double(completed) / Double(scheduled) * 100
-    }
-}
-
 /// Resumen de una categoría en el periodo elegido.
 struct CategoryStat: Identifiable {
     let category: RoutineCategory
@@ -42,27 +30,10 @@ struct StatsView: View {
     private let calendar = Calendar.current
     private var today: Date { calendar.startOfDay(for: .now) }
 
-    // MARK: - Cálculos
+    /// Las reglas de qué tocaba y qué cumpliste viven en ProgressEngine.
+    private var engine: ProgressEngine { ProgressEngine(routines: routines) }
 
-    /// Rutinas que tocaban ese día (date debe ser inicio de día).
-    private func scheduledRoutines(on date: Date) -> [Routine] {
-        let weekday = calendar.component(.weekday, from: date)
-        return routines.filter {
-            $0.isActive
-            && $0.weekdays.contains(weekday)
-            && calendar.startOfDay(for: $0.createdAt) <= date
-        }
-    }
-
-    private func isDone(_ routine: Routine, on date: Date) -> Bool {
-        routine.logs.contains { $0.day == date && $0.completed }
-    }
-
-    private func stat(for date: Date) -> DayStat {
-        let scheduled = scheduledRoutines(on: date)
-        let done = scheduled.filter { isDone($0, on: date) }
-        return DayStat(date: date, scheduled: scheduled.count, completed: done.count)
-    }
+    // MARK: - Cálculos del periodo
 
     /// Fechas del periodo, de la más antigua a hoy.
     private var rangeDates: [Date] {
@@ -72,42 +43,24 @@ struct StatsView: View {
     }
 
     private var rangeStats: [DayStat] {
-        rangeDates.map(stat(for:))
+        rangeDates.map { engine.stat(for: $0) }
     }
 
     /// Cumplimiento por categoría en el periodo (solo categorías con rutinas).
     private var categoryStats: [CategoryStat] {
-        RoutineCategory.allCases.compactMap { cat in
+        let engine = self.engine
+        return RoutineCategory.allCases.compactMap { cat in
             var scheduled = 0
             var completed = 0
             for date in rangeDates {
-                let list = scheduledRoutines(on: date).filter { $0.category == cat }
+                let list = engine.scheduledRoutines(on: date).filter { $0.category == cat }
                 scheduled += list.count
-                completed += list.filter { isDone($0, on: date) }.count
+                completed += list.filter { engine.isDone($0, on: date) }.count
             }
             return scheduled > 0
                 ? CategoryStat(category: cat, scheduled: scheduled, completed: completed)
                 : nil
         }
-    }
-
-    /// Días seguidos cumpliendo el 100% de lo que tocaba.
-    /// Los días sin rutinas no rompen la racha; hoy no la rompe mientras sigue en curso.
-    private var currentStreak: Int {
-        var streak = 0
-        for offset in 0..<365 {
-            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { break }
-            let s = stat(for: date)
-            if s.scheduled == 0 { continue }
-            if s.completed == s.scheduled {
-                streak += 1
-            } else if offset == 0 {
-                continue
-            } else {
-                break
-            }
-        }
-        return streak
     }
 
     private var average: Int {
@@ -134,7 +87,7 @@ struct StatsView: View {
                     .pickerStyle(.segmented)
 
                     HStack(spacing: 12) {
-                        StatCard(title: "Racha", value: "\(currentStreak)", unit: "días", icon: "flame.fill", color: .orange)
+                        StatCard(title: "Racha", value: "\(engine.currentStreak)", unit: "días", icon: "flame.fill", color: .orange)
                         StatCard(title: "Promedio", value: "\(average)", unit: "%", icon: "target", color: .blue)
                         StatCard(title: "Cumplidas", value: "\(totalCompleted)", unit: "\(range.rawValue) días", icon: "checkmark.seal.fill", color: .green)
                     }

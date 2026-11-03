@@ -16,6 +16,8 @@ struct FocusApp: App {
                     .tabItem { Label("Hoy", systemImage: "checklist") }
                 StatsView()
                     .tabItem { Label("Progreso", systemImage: "chart.bar.fill") }
+                AchievementsView()
+                    .tabItem { Label("Logros", systemImage: "trophy.fill") }
             }
         }
         .modelContainer(for: [Routine.self, CompletionLog.self])

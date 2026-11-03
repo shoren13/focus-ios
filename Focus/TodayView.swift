@@ -110,6 +110,14 @@ struct TodayView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+
+            // Racha de esta rutina (solo se muestra desde 2 seguidas)
+            let streak = ProgressEngine(routines: routines).streak(for: routine)
+            if streak >= 2 {
+                Label("\(streak)", systemImage: "flame.fill")
+                    .font(.caption.bold())
+                    .foregroundStyle(.orange)
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture { editingRoutine = routine }   // tocar la fila = editar
