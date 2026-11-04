@@ -92,6 +92,30 @@ struct StatsView: View {
                         StatCard(title: "Cumplidas", value: "\(totalCompleted)", unit: "\(range.rawValue) días", icon: "checkmark.seal.fill", color: .green)
                     }
 
+                    NavigationLink {
+                        WeeklyReviewView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "calendar.badge.checkmark")
+                                .font(.title3)
+                                .foregroundStyle(.tint)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Revisión semanal")
+                                    .font(.headline)
+                                Text("Cómo te fue frente a la semana anterior")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding()
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    }
+                    .buttonStyle(.plain)
+
                     dailyChart
 
                     if !categoryStats.isEmpty {

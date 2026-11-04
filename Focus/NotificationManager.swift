@@ -28,7 +28,7 @@ enum NotificationManager {
         let content = UNMutableNotificationContent()
         content.title = routine.title
         content.body = routine.reminderMinutesBefore == 0
-            ? "Tienes que empezar."
+            ? "Es hora de empezar."
             : "Empieza en \(routine.reminderMinutesBefore) min."
         content.sound = .default
 
@@ -53,6 +53,32 @@ enum NotificationManager {
     static func cancel(_ routine: Routine) {
         let ids = (1...7).map { identifier(routine, $0) }
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
+    }
+
+    // MARK: - Revisión semanal
+
+    private static let weeklyReviewID = "weekly-review"
+
+    /// Programa o cancela el aviso de los domingos según el ajuste del usuario.
+    static func syncWeeklyReview() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [weeklyReviewID])
+
+        let enabled = UserDefaults.standard.object(forKey: "weeklyReviewReminder") as? Bool ?? true
+        guard enabled else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Tu revisión semanal"
+        content.body = "Mira cómo te fue esta semana en Focus."
+        content.sound = .default
+
+        var components = DateComponents()
+        components.weekday = 1     // domingo
+        components.hour = 20
+        components.minute = 0
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        center.add(UNNotificationRequest(identifier: weeklyReviewID, content: content, trigger: trigger))
     }
 
     private static func identifier(_ routine: Routine, _ weekday: Int) -> String {

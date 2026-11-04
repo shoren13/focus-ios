@@ -106,7 +106,10 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showingAdd) { RoutineFormView() }
             .sheet(item: $editingRoutine) { RoutineFormView(routine: $0) }
-            .task { await NotificationManager.requestPermission() }
+            .task {
+                await NotificationManager.requestPermission()
+                NotificationManager.syncWeeklyReview()
+            }
         }
     }
 
