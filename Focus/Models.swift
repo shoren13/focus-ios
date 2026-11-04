@@ -53,6 +53,8 @@ final class Routine {
     var isActive: Bool
     var createdAt: Date
     var categoryRaw: String = RoutineCategory.other.rawValue
+    var pauseStarts: [Date] = []     // cuándo empezó cada pausa
+    var pauseEnds: [Date] = []       // cuándo terminó; si falta uno, sigue pausada
 
     @Relationship(deleteRule: .cascade, inverse: \CompletionLog.routine)
     var logs: [CompletionLog] = []
@@ -80,6 +82,27 @@ final class Routine {
     var minutesFromMidnight: Int {
         let c = Calendar.current.dateComponents([.hour, .minute], from: startTime)
         return (c.hour ?? 0) * 60 + (c.minute ?? 0)
+    }
+
+    /// Pausa o reactiva la rutina y deja registro de cuándo, para no alterar el pasado.
+    func setActive(_ active: Bool, at date: Date = .now) {
+        guard active != isActive else { return }
+        if active {
+            pauseEnds.append(date)
+        } else {
+            pauseStarts.append(date)
+        }
+        isActive = active
+    }
+
+    /// ¿La rutina estaba activa (no pausada) ese día? date debe ser inicio de día.
+    func wasActive(on date: Date, calendar: Calendar = .current) -> Bool {
+        for (i, start) in pauseStarts.enumerated() {
+            let from = calendar.startOfDay(for: start)
+            let until = i < pauseEnds.count ? calendar.startOfDay(for: pauseEnds[i]) : Date.distantFuture
+            if date >= from && date < until { return false }
+        }
+        return true
     }
 
     /// Texto corto con los días, ej. "L M X J V".

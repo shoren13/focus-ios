@@ -101,7 +101,7 @@ struct RoutineFormView: View {
             routine.weekdays = weekdays.sorted()
             routine.reminderMinutesBefore = reminderMinutes
             routine.category = category
-            routine.isActive = isActive
+            routine.setActive(isActive)   // registra desde cuándo está pausada
             NotificationManager.schedule(routine)   // cancela las viejas y programa las nuevas
         } else {
             let new = Routine(title: cleanTitle,

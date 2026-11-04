@@ -6,62 +6,83 @@ struct TodayView: View {
     @Query(sort: \Routine.createdAt) private var routines: [Routine]
     @State private var showingAdd = false
     @State private var editingRoutine: Routine?
+    @State private var selectedDay = Calendar.current.startOfDay(for: .now)
 
-    private var today: Date { Calendar.current.startOfDay(for: .now) }
-    private var todayWeekday: Int { Calendar.current.component(.weekday, from: .now) }
+    private let calendar = Calendar.current
+    private var today: Date { calendar.startOfDay(for: .now) }
+    private var isToday: Bool { selectedDay == today }
 
-    private func isScheduledToday(_ routine: Routine) -> Bool {
-        routine.isActive && routine.weekdays.contains(todayWeekday)
+    /// Las reglas de qué tocaba cada día viven en ProgressEngine.
+    private var engine: ProgressEngine { ProgressEngine(routines: routines) }
+
+    private var earliestDay: Date? {
+        routines.map { $0.createdAt }.min().map { calendar.startOfDay(for: $0) }
     }
 
-    private var todaysRoutines: [Routine] {
-        routines
-            .filter(isScheduledToday)
+    private var canGoBack: Bool {
+        guard let earliest = earliestDay else { return false }
+        return selectedDay > earliest
+    }
+
+    private var dayTitle: String {
+        if isToday { return "Hoy" }
+        if calendar.isDateInYesterday(selectedDay) { return "Ayer" }
+        return selectedDay.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
+    }
+
+    /// Rutinas que tocaban el día seleccionado, ordenadas por hora.
+    private var dayRoutines: [Routine] {
+        engine.scheduledRoutines(on: selectedDay)
             .sorted { $0.minutesFromMidnight < $1.minutesFromMidnight }
     }
 
-    /// Rutinas que hoy no tocan o que están pausadas.
+    /// Rutinas que ese día no tocan o que están pausadas (solo se muestran en "Hoy").
     private var otherRoutines: [Routine] {
-        routines
-            .filter { !isScheduledToday($0) }
+        let scheduled = dayRoutines
+        return routines
+            .filter { r in !scheduled.contains(where: { $0.id == r.id }) }
             .sorted { $0.minutesFromMidnight < $1.minutesFromMidnight }
     }
 
-    private var doneCount: Int { todaysRoutines.filter(isDone).count }
-    private var allDone: Bool { !todaysRoutines.isEmpty && doneCount == todaysRoutines.count }
+    private var doneCount: Int { dayRoutines.filter(isDone).count }
+    private var allDone: Bool { !dayRoutines.isEmpty && doneCount == dayRoutines.count }
+    private var sectionTitle: String { isToday ? "Hoy" : "Rutinas del día" }
 
     var body: some View {
         NavigationStack {
             List {
-                if !todaysRoutines.isEmpty {
+                daySelector
+
+                if !dayRoutines.isEmpty {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(allDone ? "¡Día completo!" : "\(doneCount) de \(todaysRoutines.count) cumplidas")
+                            Text(allDone ? "¡Día completo!" : "\(doneCount) de \(dayRoutines.count) cumplidas")
                                 .font(.headline)
                                 .foregroundStyle(allDone ? .green : .primary)
                             ProgressView(value: Double(doneCount),
-                                         total: Double(todaysRoutines.count))
+                                         total: Double(dayRoutines.count))
                                 .tint(allDone ? Color.green : Color.accentColor)
                         }
                         .padding(.vertical, 4)
                     }
 
-                    Section("Hoy") {
-                        ForEach(todaysRoutines) { routine in
-                            todayRow(routine)
+                    Section(sectionTitle) {
+                        ForEach(dayRoutines) { routine in
+                            dayRow(routine)
                         }
                         .onDelete { offsets in
-                            delete(offsets.map { todaysRoutines[$0] })
+                            delete(offsets.map { dayRoutines[$0] })
                         }
                     }
                 } else if !routines.isEmpty {
                     Section {
-                        Text("No tienes rutinas programadas para hoy.")
+                        Text(isToday ? "No tienes rutinas programadas para hoy."
+                                     : "No tenías rutinas programadas ese día.")
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                if !otherRoutines.isEmpty {
+                if isToday && !otherRoutines.isEmpty {
                     Section("Otras rutinas") {
                         ForEach(otherRoutines) { routine in
                             otherRow(routine)
@@ -79,7 +100,7 @@ struct TodayView: View {
                                            description: Text("Toca + para crear tu primera rutina."))
                 }
             }
-            .navigationTitle("Hoy")
+            .navigationTitle(isToday ? "Hoy" : "Historial")
             .toolbar {
                 Button { showingAdd = true } label: { Image(systemName: "plus") }
             }
@@ -89,9 +110,48 @@ struct TodayView: View {
         }
     }
 
+    // MARK: - Selector de día
+
+    private var daySelector: some View {
+        Section {
+            HStack {
+                Button { shiftDay(-1) } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canGoBack)
+
+                Spacer()
+
+                VStack(spacing: 2) {
+                    Text(dayTitle)
+                        .font(.headline)
+                    if !isToday {
+                        Button("Volver a hoy") { selectedDay = today }
+                            .font(.caption)
+                            .buttonStyle(.borderless)
+                    }
+                }
+
+                Spacer()
+
+                Button { shiftDay(1) } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .buttonStyle(.borderless)
+                .disabled(isToday)
+            }
+        }
+    }
+
+    private func shiftDay(_ delta: Int) {
+        guard let moved = calendar.date(byAdding: .day, value: delta, to: selectedDay) else { return }
+        selectedDay = min(calendar.startOfDay(for: moved), today)
+    }
+
     // MARK: - Filas
 
-    private func todayRow(_ routine: Routine) -> some View {
+    private func dayRow(_ routine: Routine) -> some View {
         HStack(spacing: 12) {
             Button { toggle(routine) } label: {
                 Image(systemName: isDone(routine) ? "checkmark.circle.fill" : "circle")
@@ -111,12 +171,14 @@ struct TodayView: View {
             }
             Spacer()
 
-            // Racha de esta rutina (solo se muestra desde 2 seguidas)
-            let streak = ProgressEngine(routines: routines).streak(for: routine)
-            if streak >= 2 {
-                Label("\(streak)", systemImage: "flame.fill")
-                    .font(.caption.bold())
-                    .foregroundStyle(.orange)
+            // Racha de esta rutina (solo en "Hoy" y desde 2 seguidas)
+            if isToday {
+                let streak = engine.streak(for: routine)
+                if streak >= 2 {
+                    Label("\(streak)", systemImage: "flame.fill")
+                        .font(.caption.bold())
+                        .foregroundStyle(.orange)
+                }
             }
         }
         .contentShape(Rectangle())
@@ -151,14 +213,14 @@ struct TodayView: View {
     // MARK: - Acciones
 
     private func isDone(_ routine: Routine) -> Bool {
-        routine.logs.contains { $0.day == today && $0.completed }
+        routine.logs.contains { $0.day == selectedDay && $0.completed }
     }
 
     private func toggle(_ routine: Routine) {
-        if let log = routine.logs.first(where: { $0.day == today }) {
+        if let log = routine.logs.first(where: { $0.day == selectedDay }) {
             context.delete(log)
         } else {
-            context.insert(CompletionLog(day: today, routine: routine))
+            context.insert(CompletionLog(day: selectedDay, routine: routine))
         }
     }
 

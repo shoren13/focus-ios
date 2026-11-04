@@ -28,7 +28,7 @@ enum NotificationManager {
         let content = UNMutableNotificationContent()
         content.title = routine.title
         content.body = routine.reminderMinutesBefore == 0
-            ? "Es hora de empezar."
+            ? "Tienes que empezar."
             : "Empieza en \(routine.reminderMinutesBefore) min."
         content.sound = .default
 

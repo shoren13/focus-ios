@@ -42,7 +42,7 @@ struct ProgressEngine {
     func scheduledRoutines(on date: Date) -> [Routine] {
         let weekday = calendar.component(.weekday, from: date)
         return routines.filter {
-            $0.isActive
+            $0.wasActive(on: date, calendar: calendar)
             && $0.weekdays.contains(weekday)
             && calendar.startOfDay(for: $0.createdAt) <= date
         }
@@ -118,6 +118,7 @@ struct ProgressEngine {
             if date < created { break }
             let weekday = calendar.component(.weekday, from: date)
             if !routine.weekdays.contains(weekday) { continue }
+            if !routine.wasActive(on: date, calendar: calendar) { continue }   // días en pausa no rompen la racha
             if isDone(routine, on: date) {
                 count += 1
             } else if offset == 0 {
