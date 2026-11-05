@@ -20,6 +20,6 @@ struct FocusApp: App {
                     .tabItem { Label("Logros", systemImage: "trophy.fill") }
             }
         }
-        .modelContainer(for: [Routine.self, CompletionLog.self])
+        .modelContainer(for: [Routine.self, CompletionLog.self, DayEntry.self])
     }
 }

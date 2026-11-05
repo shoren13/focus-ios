@@ -74,6 +74,11 @@ struct TodayView: View {
                             delete(offsets.map { dayRoutines[$0] })
                         }
                     }
+
+                    Section("Cierre del día") {
+                        DayEntryCard(day: selectedDay)
+                            .id(selectedDay)
+                    }
                 } else if !routines.isEmpty {
                     Section {
                         Text(isToday ? "No tienes rutinas programadas para hoy."

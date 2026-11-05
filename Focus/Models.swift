@@ -113,6 +113,20 @@ final class Routine {
     }
 }
 
+/// Cierre del día: ánimo (1 a 5, 0 = sin registrar) y una nota corta.
+@Model
+final class DayEntry {
+    var day: Date          // siempre el inicio del día (00:00)
+    var mood: Int
+    var note: String
+
+    init(day: Date, mood: Int = 0, note: String = "") {
+        self.day = day
+        self.mood = mood
+        self.note = note
+    }
+}
+
 /// Un registro por cada día que cumples una rutina. De aquí salen los reportes.
 @Model
 final class CompletionLog {

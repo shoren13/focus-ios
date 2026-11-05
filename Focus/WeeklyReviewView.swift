@@ -4,6 +4,7 @@ import SwiftData
 /// Resumen de los últimos 7 días comparado con los 7 anteriores.
 struct WeeklyReviewView: View {
     @Query private var routines: [Routine]
+    @Query private var entries: [DayEntry]
     @AppStorage("weeklyReviewReminder") private var reminderOn = true
 
     private let calendar = Calendar.current
@@ -103,6 +104,7 @@ struct WeeklyReviewView: View {
 
                 daysCard(current: current)
                 reinforceCard(results: results)
+                moodCard(current: current)
 
                 card {
                     Toggle("Recordarme la revisión los domingos a las 8:00 pm", isOn: $reminderOn)
@@ -170,6 +172,39 @@ struct WeeklyReviewView: View {
                         .foregroundStyle(.orange)
                 }
                 .font(.subheadline)
+            }
+        }
+    }
+
+    private func averageMood(_ values: [Int]) -> String {
+        guard !values.isEmpty else { return "–" }
+        let avg = Double(values.reduce(0, +)) / Double(values.count)
+        return avg.formatted(.number.precision(.fractionLength(1)))
+    }
+
+    /// Ánimo promedio de la semana y cómo se relaciona con tus días completos.
+    @ViewBuilder
+    private func moodCard(current: WeekData) -> some View {
+        let moods: [(stat: DayStat, mood: Int)] = current.stats.compactMap { s -> (stat: DayStat, mood: Int)? in
+            guard let e = entries.first(where: { $0.day == s.date && $0.mood > 0 }) else { return nil }
+            return (stat: s, mood: e.mood)
+        }
+        if moods.count >= 2 {
+            let all = moods.map { $0.mood }
+            let perfect = moods.filter { $0.stat.isPerfect }.map { $0.mood }
+            let other = moods.filter { !$0.stat.isPerfect && $0.stat.scheduled > 0 }.map { $0.mood }
+            card {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Ánimo", systemImage: "face.smiling")
+                        .font(.headline)
+                    Text("Tu ánimo promedio fue \(averageMood(all)) de 5, en \(moods.count) días registrados.")
+                        .font(.subheadline)
+                    if perfect.count >= 2 && other.count >= 2 {
+                        Text("En tus días al 100% fue \(averageMood(perfect)) y en los incompletos \(averageMood(other)). Es una relación entre datos, no necesariamente una causa.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }
